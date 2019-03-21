@@ -15,7 +15,7 @@
 #include "MultiEllipsoidSampler.h"
 #include "Ellipsoid.h"
 #include "KmeansClusterer.h"
-#include "ParallelGaussianMixtureClusterer.h"
+//#include "ParallelGaussianMixtureClusterer.h"
 #include "EuclideanMetric.h"
 #include "Prior.h"
 #include "UniformPrior.h"
@@ -109,7 +109,11 @@ int main(int argc, char *argv[])
     unsigned long Ndimensions;              // Number of parameters for which prior distributions are defined
     
     // Read prior hyper parameters for resolved modes
-    inputFileName = outputDirName + "background_hyperParameters.txt";
+    if (backgroundModelName == "ThreeHarveyNoGaussian")
+        inputFileName = outputDirName + "background_hyperParameters.txt";
+    else
+        inputFileName = outputDirName + "background_hyperParameters.txt";
+
     File::openInputFile(inputFile, inputFileName);
     File::sniffFile(inputFile, Ndimensions, Ncols);
     
@@ -129,19 +133,78 @@ int main(int argc, char *argv[])
     
     ArrayXXd hyperParameters;
     hyperParameters = File::arrayXXdFromFile(inputFile, Ndimensions, Ncols);
-    inputFile.close(); 
     ArrayXd hyperParametersMinima = hyperParameters.col(0);
     ArrayXd hyperParametersMaxima = hyperParameters.col(1);
+    inputFile.close(); 
 
     // Uniform Prior
-    int NpriorTypes = 1;                                    // Total number of prior types included in the computation
-    vector<Prior*> ptrPriors(NpriorTypes);
-    
-    UniformPrior uniformPrior(hyperParametersMinima, hyperParametersMaxima);
-    ptrPriors[0] = &uniformPrior;
+    int NpriorTypes;
 
-    string fullPathHyperParameters = outputPathPrefix + "hyperParametersUniform.txt";
-    uniformPrior.writeHyperParametersToFile(fullPathHyperParameters);
+    if (backgroundModelName == "ThreeHarveyNoGaussian")
+        NpriorTypes = 1;                                    // Total number of prior types included in the computation
+    else
+        NpriorTypes = 3;                                    // Total number of prior types included in the computation
+
+    vector<Prior*> ptrPriors(NpriorTypes);
+
+
+
+    UniformPrior *uniformPriorNoGaussian = nullptr;
+    NormalPrior *nuMaxPrior = nullptr;
+    UniformPrior *uniformAmpSigma = nullptr;
+
+    //Setting up both noise and full background model
+    if (backgroundModelName == "ThreeHarveyNoGaussian")
+    {
+        uniformPriorNoGaussian = new UniformPrior(hyperParametersMinima,hyperParametersMaxima);
+        ptrPriors[0] = uniformPriorNoGaussian;
+
+        string fullPathHyperParameters = outputPathPrefix + "hyperParametersUniform.txt";
+        uniformPriorNoGaussian->writeHyperParametersToFile(fullPathHyperParameters);
+    }
+    else
+    {
+        ArrayXd lower_uniform_minima(8);
+        ArrayXd lower_uniform_maxima(8);
+
+        ArrayXd gaussian_nu_max_mean(1);
+        ArrayXd gaussian_nu_max_std(1);
+
+        ArrayXd upper_uniform_minima(1);
+        ArrayXd upper_uniform_maxima(1);
+
+        lower_uniform_minima << hyperParametersMinima[0],hyperParametersMinima[1],hyperParametersMinima[2]
+                ,hyperParametersMinima[3],hyperParametersMinima[4],hyperParametersMinima[5],hyperParametersMinima[6]
+                ,hyperParametersMinima[7];
+
+        lower_uniform_maxima << hyperParametersMaxima[0],hyperParametersMaxima[1],hyperParametersMaxima[2]
+                ,hyperParametersMaxima[3],hyperParametersMaxima[4],hyperParametersMaxima[5],hyperParametersMaxima[6]
+                ,hyperParametersMaxima[7];
+
+        gaussian_nu_max_mean << (hyperParametersMinima[8] + hyperParametersMaxima[8])/2;
+        gaussian_nu_max_std << (hyperParametersMaxima[8] - hyperParametersMinima[8])/2;
+
+
+        upper_uniform_minima << hyperParametersMinima[9];
+        upper_uniform_maxima << hyperParametersMaxima[9];
+
+        uniformPriorNoGaussian = new UniformPrior(lower_uniform_minima,lower_uniform_maxima);
+        nuMaxPrior = new NormalPrior(gaussian_nu_max_mean,gaussian_nu_max_std);
+        uniformAmpSigma = new UniformPrior(upper_uniform_minima,upper_uniform_maxima);
+
+        ptrPriors[0] = uniformPriorNoGaussian;
+        ptrPriors[1] = nuMaxPrior;
+        ptrPriors[2] = uniformAmpSigma;
+
+        string fullPathHyperParameters = outputPathPrefix + "hyperParametersUniform_lower.txt";
+        uniformPriorNoGaussian->writeHyperParametersToFile(fullPathHyperParameters);
+
+        fullPathHyperParameters = outputPathPrefix + "hyperParametersGaussian_nu_max.txt";
+        nuMaxPrior->writeHyperParametersToFile(fullPathHyperParameters);
+
+        fullPathHyperParameters = outputPathPrefix + "hyperParametersUniform_upper.txt";
+        uniformAmpSigma->writeHyperParametersToFile(fullPathHyperParameters);
+    }
 
 
     // -------------------------------------------------------------------

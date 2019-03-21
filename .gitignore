@@ -48,3 +48,7 @@ test/*
 .DS_Store*
 Icon?
 Thumbs.db
+
+\.idea/
+
+cmake-build-debug/
