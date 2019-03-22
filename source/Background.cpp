@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     
     // Read prior hyper parameters for resolved modes
     if (backgroundModelName == "ThreeHarveyNoGaussian")
-        inputFileName = outputDirName + "background_hyperParameters.txt";
+        inputFileName = outputDirName + "background_hyperParameters_noise.txt";
     else
         inputFileName = outputDirName + "background_hyperParameters.txt";
 
